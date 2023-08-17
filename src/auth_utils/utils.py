@@ -32,6 +32,17 @@ class BaseUser(StarletteBaseUser):
         """
         raise NotImplementedError()
 
+    def has_role(self, role: str):
+        """Checks if user has a specific role or not.
+
+        Args:
+            perm (str): The role
+
+        Raises:
+            NotImplementedError: This method must be implemented by user.
+        """
+        raise NotImplementedError()
+
     def has_perms(self, perms: Sequence[str]):
         """Checks if user has all given permissions or not.
         Calls has_perm() for each permission by default.
@@ -40,6 +51,15 @@ class BaseUser(StarletteBaseUser):
             perm (Sequence[str]): The permissions sequence.
         """
         return all(map(self.has_perm, perms))
+
+    def has_roles(self, roles: Sequence[str]):
+        """Checks if user has all given roles or not.
+        Calls has_role() for each permission by default.
+
+        Args:
+            perm (Sequence[str]): The permissions sequence.
+        """
+        return all(map(self.has_role, roles))
 
 
 def get_user(request: Request) -> BaseUser | UnauthenticatedUser:
@@ -58,12 +78,19 @@ def get_user(request: Request) -> BaseUser | UnauthenticatedUser:
     return request.user
 
 
-def auth_required(permissions: list[str] | None = None):
+def auth_required(
+    *,
+    permissions: list[Any] | None = None,
+    roles: list[Any] | None = None,
+):
     """Enforces authentication and authorization for current user.
 
     Args:
         permissions (list[str] | None, optional): The permissions user
             MUST have. Defaults to none.
+
+        roles (list[str] | None, optional): The roles user MUST have.
+            Defaults to none.
     """
 
     def auth_checker(
@@ -73,14 +100,18 @@ def auth_required(permissions: list[str] | None = None):
                 HTTPBearer(auto_error=False)  # Errors are manually handled
             ),
         ],  # Enables authorize options in swagger
-        user: Annotated[Any, Depends(get_user)],
+        user: Annotated[BaseUser, Depends(get_user)],
     ):
         # If user is not authenticated
         if not user.is_authenticated:
             raise HTTPException(HTTPStatus.UNAUTHORIZED)
 
-        # If user is not authorized
-        if not all(map(user.has_perm, permissions or [])):
+        # If user is not authorized (insufficient roles)
+        if not user.has_roles(roles or []):
+            raise HTTPException(HTTPStatus.FORBIDDEN)
+
+        # If user is not authorized (insufficient permissions)
+        if not user.has_perms(permissions or []):
             raise HTTPException(HTTPStatus.FORBIDDEN)
 
     return auth_checker

@@ -18,9 +18,13 @@ class User(BaseUser, BaseModel):
     sub: str
     name: str = ""
     permissions: list[str]
+    roles: list[str] = []
 
     def has_perm(self, perm: str):
         return perm in self.permissions
+
+    def has_role(self, role: str):
+        return role in self.roles
 
     @property
     def identity(self) -> str:
@@ -42,18 +46,24 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup():
+    payload = User(
+        sub="user-0", name="test", roles=["user"], permissions=["home"]
+    ).model_dump()
+
     print("JWT signing algorithm: ", JWT_ALGORITHM)
     print("JWT signing key: ", JWT_KEY)
+    print("JWT payload: ", payload)
     print(
         "Example JWT token: ",
-        jwt.encode(
-            User(sub="user-0", name="test", permissions=["home"]).model_dump(),
-            JWT_KEY,
-            JWT_ALGORITHM,
-        ),
+        jwt.encode(payload, JWT_KEY, JWT_ALGORITHM),
     )
 
 
-@app.get("/", dependencies=[Depends(auth_required(permissions=["home"]))])
+@app.get(
+    "/",
+    dependencies=[
+        Depends(auth_required(roles=["user"], permissions=["home"]))
+    ],
+)
 def me(request: Request):
     return {"user": request.user}
