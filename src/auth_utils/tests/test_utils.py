@@ -14,22 +14,27 @@ from auth_utils.backends import JWTAuthBackend
 JWT_ALGORITHM = "HS256"
 JWT_KEY = str(uuid.uuid4())
 
+RANDOM_CLAIM = str(uuid.uuid4())
 RANDOM_ROLE = str(uuid.uuid4())
-RANDOM_PERMISSION = str(uuid.uuid4())
 
 
 class User(BaseUser, BaseModel):
-    """A test user class which has sub and permissions"""
+    """A test user class which has sub and claims"""
 
     sub: str
     roles: list[str]
-    permissions: list[str]
+    claims: list[str]
 
     def has_perm(self, perm: str):
-        return perm in self.permissions
+        perm_type, perm_val = perm.split(":")
 
-    def has_role(self, role: str):
-        return role in self.roles
+        match perm_type:
+            case "role":
+                return perm_val in self.roles  # Required role
+            case "claim":
+                return perm_val in self.claims  # Required claim
+            case _:
+                return False
 
 
 app = FastAPI()
@@ -45,10 +50,10 @@ def get_headers(
     *,
     sub: str,
     roles: list[str] | None = None,
-    permissions: list[str] | None = None,
+    claims: list[str] | None = None,
 ) -> dict:
     token = jwt.encode(
-        {"sub": sub, "roles": roles or [], "permissions": permissions or []},
+        {"sub": sub, "roles": roles or [], "claims": claims or []},
         JWT_KEY,
         JWT_ALGORITHM,
     )
@@ -64,19 +69,17 @@ def auth_no_perm():
 
 @app.get(
     "/auth_with_perm",
-    dependencies=[Depends(auth_required(permissions=[RANDOM_PERMISSION]))],
+    dependencies=[
+        Depends(
+            # Requires user to have both RANDOM_CLAIM and RANDOM_ROLE
+            auth_required(
+                permissions=[f"claim:{RANDOM_CLAIM}", f"role:{RANDOM_ROLE}"]
+            )
+        )
+    ],
 )
 def auth_with_perm():
-    """Requires the user to have `RANDOM_PERMISSION` permission as well."""
-    return {"msg": "Well done!"}
-
-
-@app.get(
-    "/auth_with_role",
-    dependencies=[Depends(auth_required(roles=[RANDOM_ROLE]))],
-)
-def auth_with_role():
-    """Requires the user to have `RANDOM_ROLE` permission as well."""
+    """Requires the user to have `RANDOM_PERMISSION` claim as well."""
     return {"msg": "Well done!"}
 
 
@@ -90,7 +93,7 @@ def test_auth_no_perm_unauthenticated():
 
 def test_auth_no_perm_authenticated():
     response = client.get(
-        "/auth_no_perm", headers=get_headers(sub="test", permissions=[])
+        "/auth_no_perm", headers=get_headers(sub="test", claims=[])
     )
 
     assert response.status_code == HTTPStatus.OK  # 200
@@ -101,34 +104,35 @@ def test_auth_with_perm_unauthenticated():
     assert response.status_code == HTTPStatus.UNAUTHORIZED  # 401
 
 
-def test_auth_with_perm_authenticated_without_perm():
+def test_auth_with_perm_authenticated_unauthorized():
     response = client.get(
-        "/auth_with_perm", headers=get_headers(sub="test", permissions=[])
+        "/auth_with_perm", headers=get_headers(sub="test", claims=[], roles=[])
     )
 
     assert response.status_code == HTTPStatus.FORBIDDEN  # 403
 
 
-def test_auth_with_perm_authenticated_with_perm():
+def test_auth_with_perm_authenticated_fully_authorized():
     response = client.get(
         "/auth_with_perm",
-        headers=get_headers(sub="test", permissions=[RANDOM_PERMISSION]),
+        headers=get_headers(
+            sub="test", claims=[RANDOM_CLAIM], roles=[RANDOM_ROLE]
+        ),
     )
 
     assert response.status_code == HTTPStatus.OK  # 200
 
 
-def test_auth_with_role_authenticated_without_role():
-    response = client.get(
-        "/auth_with_role", headers=get_headers(sub="test", roles=[])
+def test_auth_with_perm_authenticated_partially_authorized():
+    no_claim_response = client.get(
+        "/auth_with_perm",
+        headers=get_headers(sub="test", claims=[], roles=[RANDOM_ROLE]),
     )
 
-    assert response.status_code == HTTPStatus.FORBIDDEN  # 403
-
-
-def test_auth_with_role_authenticated_with_role():
-    response = client.get(
-        "/auth_with_role", headers=get_headers(sub="test", roles=[RANDOM_ROLE])
+    no_role_response = client.get(
+        "/auth_with_perm",
+        headers=get_headers(sub="test", claims=[RANDOM_CLAIM], roles=[]),
     )
 
-    assert response.status_code == HTTPStatus.OK  # 200
+    assert no_claim_response.status_code == HTTPStatus.FORBIDDEN  # 403
+    assert no_role_response.status_code == HTTPStatus.FORBIDDEN  # 403

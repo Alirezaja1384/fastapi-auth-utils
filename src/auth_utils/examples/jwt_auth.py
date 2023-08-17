@@ -12,19 +12,27 @@ JWT_KEY = str(uuid.uuid4())
 JWT_ALGORITHM = "HS256"
 
 
+class Permission(BaseModel):
+    claims: list[str] | None = None
+    roles: list[str] | None = None
+
+
 class User(BaseUser, BaseModel):
     """A test user class which has sub and permissions"""
 
     sub: str
     name: str = ""
-    permissions: list[str]
+    claims: list[str]
     roles: list[str] = []
 
-    def has_perm(self, perm: str):
-        return perm in self.permissions
+    def has_perm(self, perm: Permission):
+        def has_roles(roles: list[str]):
+            return all(map(lambda role: role in self.roles, roles))
 
-    def has_role(self, role: str):
-        return role in self.roles
+        def has_claims(claims: list[str]):
+            return all(map(lambda claim: claim in self.claims, claims))
+
+        return has_roles(perm.roles or []) and has_claims(perm.claims or [])
 
     @property
     def identity(self) -> str:
@@ -47,7 +55,7 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     payload = User(
-        sub="user-0", name="test", roles=["user"], permissions=["home"]
+        sub="user-0", name="test", roles=["user"], claims=["home"]
     ).model_dump()
 
     print("JWT signing algorithm: ", JWT_ALGORITHM)
@@ -62,7 +70,11 @@ def startup():
 @app.get(
     "/",
     dependencies=[
-        Depends(auth_required(roles=["user"], permissions=["home"]))
+        Depends(
+            auth_required(
+                permissions=[Permission(claims=["home"], roles=["user"])]
+            )
+        )
     ],
 )
 def me(request: Request):

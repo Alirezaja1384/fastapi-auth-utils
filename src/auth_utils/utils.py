@@ -21,29 +21,18 @@ class BaseUser(StarletteBaseUser):
     def is_authenticated(self):
         return True
 
-    def has_perm(self, perm: str):
+    def has_perm(self, perm: Any) -> bool:
         """Checks if user has a specific permission or not.
 
         Args:
-            perm (str): The permission
+            perm (Any): The permission
 
         Raises:
             NotImplementedError: This method must be implemented by user.
         """
         raise NotImplementedError()
 
-    def has_role(self, role: str):
-        """Checks if user has a specific role or not.
-
-        Args:
-            perm (str): The role
-
-        Raises:
-            NotImplementedError: This method must be implemented by user.
-        """
-        raise NotImplementedError()
-
-    def has_perms(self, perms: Sequence[str]):
+    def has_perms(self, perms: Sequence[Any]) -> bool:
         """Checks if user has all given permissions or not.
         Calls has_perm() for each permission by default.
 
@@ -51,15 +40,6 @@ class BaseUser(StarletteBaseUser):
             perm (Sequence[str]): The permissions sequence.
         """
         return all(map(self.has_perm, perms))
-
-    def has_roles(self, roles: Sequence[str]):
-        """Checks if user has all given roles or not.
-        Calls has_role() for each permission by default.
-
-        Args:
-            perm (Sequence[str]): The permissions sequence.
-        """
-        return all(map(self.has_role, roles))
 
 
 def get_user(request: Request) -> BaseUser | UnauthenticatedUser:
@@ -78,11 +58,7 @@ def get_user(request: Request) -> BaseUser | UnauthenticatedUser:
     return request.user
 
 
-def auth_required(
-    *,
-    permissions: list[Any] | None = None,
-    roles: list[Any] | None = None,
-):
+def auth_required(permissions: list[Any] | None = None):
     """Enforces authentication and authorization for current user.
 
     Args:
@@ -106,11 +82,7 @@ def auth_required(
         if not user.is_authenticated:
             raise HTTPException(HTTPStatus.UNAUTHORIZED)
 
-        # If user is not authorized (insufficient roles)
-        if not user.has_roles(roles or []):
-            raise HTTPException(HTTPStatus.FORBIDDEN)
-
-        # If user is not authorized (insufficient permissions)
+        # If user is not authorized
         if not user.has_perms(permissions or []):
             raise HTTPException(HTTPStatus.FORBIDDEN)
 
