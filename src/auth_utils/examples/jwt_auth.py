@@ -43,7 +43,7 @@ class User(BaseUser, BaseModel):
         return self.name
 
 
-app = FastAPI()
+app = FastAPI(docs_url="/docs")
 app.add_middleware(
     AuthenticationMiddleware,
     backend=JWTAuthBackend(

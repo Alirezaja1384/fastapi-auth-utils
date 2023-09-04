@@ -1,4 +1,5 @@
 import uuid
+import logging
 from datetime import datetime, timedelta
 
 import jwt
@@ -64,14 +65,14 @@ def generate_token(
     return payload, jwt.encode(payload, JWT_KEY, JWT_ALGORITHM)
 
 
-def test_unauthenticated():
+def test_jwt_unauthenticated():
     response = client.get("/me")
 
     assert response.status_code == 200
     assert response.json()["is_authenticated"] is False
 
 
-def test_authenticated():
+def test_jwt_authenticated():
     payload, token = generate_token(
         sub=str(uuid.uuid4()),
         permissions=[str(uuid.uuid4())],
@@ -89,14 +90,14 @@ def test_authenticated():
     assert "an_invalid_field" not in json_response
 
 
-def test_invalid_bearer():
+def test_jwt_invalid_bearer():
     response = client.get("/me", headers={"Authorization": "Bearer invalid"})
 
     assert response.status_code == 200
     assert response.json()["is_authenticated"] is False
 
 
-def test_expired_token():
+def test_jwt_expired_token():
     _, token = generate_token(
         exp=datetime.timestamp(datetime.now() - timedelta(hours=1))
     )
@@ -105,14 +106,14 @@ def test_expired_token():
     assert response.json()["is_authenticated"] is False
 
 
-def test_invalid_audience():
+def test_jwt_invalid_audience():
     _, token = generate_token(aud=str(uuid.uuid4()))
 
     response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert response.json()["is_authenticated"] is False
 
 
-def test_no_audience():
+def test_jwt_no_audience():
     payload, token = generate_token(aud=None, exclude_none_values=True)
     assert "aud" not in payload
 
@@ -120,16 +121,32 @@ def test_no_audience():
     assert response.json()["is_authenticated"] is False
 
 
-def test_invalid_issuer():
+def test_jwt_invalid_issuer():
     _, token = generate_token(iss=str(uuid.uuid4()))
 
     response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert response.json()["is_authenticated"] is False
 
 
-def test_no_issuer():
+def test_jwt_no_issuer():
     payload, token = generate_token(iss=None, exclude_none_values=True)
     assert "iss" not in payload
 
     response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert response.json()["is_authenticated"] is False
+
+
+def test_jwt_logging_expired_token(caplog):
+    _, token = generate_token(
+        exp=datetime.timestamp(datetime.now() - timedelta(hours=1))
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        client.get("/me", headers={"Authorization": f"Bearer {token}"})
+        assert "ExpiredSignatureError" in caplog.text
+
+
+def test_jwt_logging_invalid(caplog):
+    with caplog.at_level(logging.WARNING):
+        client.get("/me", headers={"Authorization": "Bearer invalid_token"})
+        assert "DecodeError" in caplog.text

@@ -37,12 +37,15 @@ class JWTAuthBackend(AuthenticationBackend):
 
         self.logger = logging.getLogger("jwt-auth-backend")
 
-    def get_payload(self, token: str, fail_silently: bool) -> dict | None:
+    def get_payload(
+        self, token: str, fail_silently: bool, log_errors: bool = True
+    ) -> dict | None:
         """Returns the payload of VALID token.
 
         Args:
             token (str): JWT token.
             fail_silently (bool): Returns `None` on errors instead of raising.
+            log_errors (bool, optional): Logs PyJWT exceptions if True.
 
         Returns:
             dict | None: Decoded payload for valid tokens and
@@ -57,7 +60,18 @@ class JWTAuthBackend(AuthenticationBackend):
                 issuer=self.issuer,
             )
 
-        except jwt.PyJWTError:
+        except jwt.PyJWTError as exc:
+            if log_errors:
+                self.logger.log(
+                    level=(
+                        logging.DEBUG
+                        if isinstance(exc, jwt.ExpiredSignatureError)
+                        else logging.WARNING
+                    ),
+                    msg=repr(exc),
+                    exc_info=False,
+                )
+
             if fail_silently:
                 return None
 
@@ -83,7 +97,9 @@ class JWTAuthBackend(AuthenticationBackend):
             token = auth_header.split(" ")[1]
 
             # Authenticate the user if token is valid
-            if payload := self.get_payload(token=token, fail_silently=True):
+            if payload := self.get_payload(
+                token=token, fail_silently=True, log_errors=True
+            ):
                 return AuthCredentials(["authenticated"]), self.user_class(
                     **payload
                 )
