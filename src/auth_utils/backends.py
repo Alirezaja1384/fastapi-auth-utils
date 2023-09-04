@@ -18,16 +18,23 @@ class JWTAuthBackend(AuthenticationBackend):
     key: str
     decode_algorithms: list[str]
     user_class: Type[BaseUser]
+    audience: str | None
+    issuer: str | None
 
     def __init__(
         self,
         key: str,
         decode_algorithms: list[str],
         user_class: Type[BaseUser],
+        audience: str | None = None,
+        issuer: str | None = None,
     ) -> None:
         self.key = key
         self.decode_algorithms = decode_algorithms
         self.user_class = user_class
+        self.audience = audience
+        self.issuer = issuer
+
         self.logger = logging.getLogger("jwt-auth-backend")
 
     def get_payload(self, token: str, fail_silently: bool) -> dict | None:
@@ -35,6 +42,7 @@ class JWTAuthBackend(AuthenticationBackend):
 
         Args:
             token (str): JWT token.
+            fail_silently (bool): Returns `None` on errors instead of raising.
 
         Returns:
             dict | None: Decoded payload for valid tokens and
@@ -42,7 +50,11 @@ class JWTAuthBackend(AuthenticationBackend):
         """
         try:
             return jwt.decode(
-                token, key=self.key, algorithms=self.decode_algorithms
+                token,
+                key=self.key,
+                algorithms=self.decode_algorithms,
+                audience=self.audience,
+                issuer=self.issuer,
             )
 
         except jwt.PyJWTError:

@@ -13,6 +13,8 @@ from auth_utils.backends import JWTAuthBackend
 
 JWT_KEY = str(uuid.uuid4())
 JWT_ALGORITHM = "HS256"
+JWT_ISSUER = str(uuid.uuid4())
+JWT_AUDIENCE = str(uuid.uuid4())
 
 
 class User(BaseUser, BaseModel):
@@ -26,7 +28,11 @@ app = FastAPI()
 app.add_middleware(
     AuthenticationMiddleware,
     backend=JWTAuthBackend(
-        key=JWT_KEY, decode_algorithms=[JWT_ALGORITHM], user_class=User
+        key=JWT_KEY,
+        decode_algorithms=[JWT_ALGORITHM],
+        user_class=User,
+        issuer=JWT_ISSUER,
+        audience=JWT_AUDIENCE,
     ),
 )
 
@@ -42,21 +48,36 @@ def me(request: Request):
 client = TestClient(app=app)
 
 
-def test_request_user_unauthenticated():
+def generate_token(
+    *, exclude_none_values: bool = True, **kwargs
+) -> tuple[dict, str]:
+    payload = {
+        "sub": str(uuid.uuid4()),
+        "aud": JWT_AUDIENCE,
+        "iss": JWT_ISSUER,
+        **kwargs,
+    }
+
+    if exclude_none_values:
+        payload = {key: val for key, val in payload.items() if val is not None}
+
+    return payload, jwt.encode(payload, JWT_KEY, JWT_ALGORITHM)
+
+
+def test_unauthenticated():
     response = client.get("/me")
 
     assert response.status_code == 200
     assert response.json()["is_authenticated"] is False
 
 
-def test_request_user_authenticated():
-    payload = {
-        "sub": "test-user",
-        "permissions": ["test"],
-        "an_invalid_field": "test",
-    }
+def test_authenticated():
+    payload, token = generate_token(
+        sub=str(uuid.uuid4()),
+        permissions=[str(uuid.uuid4())],
+        an_invalid_field=str(uuid.uuid4()),
+    )
 
-    token = jwt.encode(payload, JWT_KEY, JWT_ALGORITHM)
     response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
@@ -68,22 +89,47 @@ def test_request_user_authenticated():
     assert "an_invalid_field" not in json_response
 
 
-def test_request_user_invalid_token():
+def test_invalid_bearer():
     response = client.get("/me", headers={"Authorization": "Bearer invalid"})
 
     assert response.status_code == 200
     assert response.json()["is_authenticated"] is False
 
 
-def test_request_user_expired_token():
-    payload = {
-        "sub": "test-user",
-        "permissions": ["test"],
-        "exp": datetime.timestamp(datetime.now() - timedelta(hours=1)),
-    }
+def test_expired_token():
+    _, token = generate_token(
+        exp=datetime.timestamp(datetime.now() - timedelta(hours=1))
+    )
 
-    token = jwt.encode(payload, JWT_KEY, JWT_ALGORITHM)
     response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.json()["is_authenticated"] is False
 
-    assert response.status_code == 200
+
+def test_invalid_audience():
+    _, token = generate_token(aud=str(uuid.uuid4()))
+
+    response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.json()["is_authenticated"] is False
+
+
+def test_no_audience():
+    payload, token = generate_token(aud=None, exclude_none_values=True)
+    assert "aud" not in payload
+
+    response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.json()["is_authenticated"] is False
+
+
+def test_invalid_issuer():
+    _, token = generate_token(iss=str(uuid.uuid4()))
+
+    response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.json()["is_authenticated"] is False
+
+
+def test_no_issuer():
+    payload, token = generate_token(iss=None, exclude_none_values=True)
+    assert "iss" not in payload
+
+    response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert response.json()["is_authenticated"] is False
