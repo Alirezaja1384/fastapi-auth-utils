@@ -1,5 +1,5 @@
 from .utils import BaseUser, get_user, auth_required
-from .backends import JWTAuthBackend
+from .backends import JWTAuthBackend, APIKeyAuthBackend, AuthBackendsWrapper
 
 
 __all__ = [
@@ -7,4 +7,6 @@ __all__ = [
     "get_user",
     "auth_required",
     "JWTAuthBackend",
+    "APIKeyAuthBackend",
+    "AuthBackendsWrapper",
 ]

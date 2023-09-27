@@ -3,6 +3,7 @@ import uuid
 import jwt
 from pydantic import BaseModel
 from fastapi import Depends, FastAPI, Request
+from fastapi.security import HTTPBearer
 from starlette.middleware.authentication import AuthenticationMiddleware
 
 from auth_utils.utils import BaseUser, auth_required
@@ -43,7 +44,12 @@ class User(BaseUser, BaseModel):
         return self.name
 
 
-app = FastAPI(docs_url="/docs")
+app = FastAPI(
+    docs_url="/docs",
+    # NOTE: Following dependency enables authorize functionality for swagger
+    dependencies=[Depends(HTTPBearer(auto_error=False))],
+)
+
 app.add_middleware(
     AuthenticationMiddleware,
     backend=JWTAuthBackend(

@@ -1,8 +1,7 @@
 from http import HTTPStatus
 from typing import Annotated, Any, Sequence
 
-from fastapi import Depends, HTTPException, Request, Security
-from fastapi.security import HTTPBearer
+from fastapi import Depends, HTTPException, Request
 from starlette.authentication import (
     BaseUser as StarletteBaseUser,
     UnauthenticatedUser,
@@ -62,20 +61,11 @@ def auth_required(permissions: list[Any] | None = None):
     """Enforces authentication and authorization for current user.
 
     Args:
-        permissions (list[str] | None, optional): The permissions user
+        permissions (list[Any] | None, optional): The permissions user
             MUST have. Defaults to none.
-
-        roles (list[str] | None, optional): The roles user MUST have.
-            Defaults to none.
     """
 
     def auth_checker(
-        _: Annotated[
-            str,
-            Security(
-                HTTPBearer(auto_error=False)  # Errors are manually handled
-            ),
-        ],  # Enables authorize options in swagger
         user: Annotated[BaseUser, Depends(get_user)],
     ):
         # If user is not authenticated
