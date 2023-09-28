@@ -18,7 +18,7 @@ class Permission(BaseModel):
     roles: list[str] | None = None
 
 
-class User(BaseUser, BaseModel):
+class JWTUser(BaseUser, BaseModel):
     """A test user class which has sub and permissions"""
 
     sub: str
@@ -53,14 +53,14 @@ app = FastAPI(
 app.add_middleware(
     AuthenticationMiddleware,
     backend=JWTAuthBackend(
-        key=JWT_KEY, decode_algorithms=[JWT_ALGORITHM], user_class=User
+        key=JWT_KEY, decode_algorithms=[JWT_ALGORITHM], user_class=JWTUser
     ),
 )
 
 
 @app.on_event("startup")
 def startup():
-    payload = User(
+    payload = JWTUser(
         sub="user-0", name="test", roles=["user"], claims=["home"]
     ).model_dump()
 
@@ -78,7 +78,8 @@ def startup():
     dependencies=[
         Depends(
             auth_required(
-                permissions=[Permission(claims=["home"], roles=["user"])]
+                permissions=[Permission(claims=["home"], roles=["user"])],
+                user_class=JWTUser,
             )
         )
     ],

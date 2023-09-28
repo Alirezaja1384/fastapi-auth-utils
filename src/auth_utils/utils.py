@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Annotated, Any, Sequence
+from typing import Annotated, Any, Sequence, Type
 
 from fastapi import Depends, HTTPException, Request
 from starlette.authentication import (
@@ -57,7 +57,9 @@ def get_user(request: Request) -> BaseUser | UnauthenticatedUser:
     return request.user
 
 
-def auth_required(permissions: list[Any] | None = None):
+def auth_required(
+    permissions: list[Any] | None = None, user_class: Type[BaseUser] = BaseUser
+):
     """Enforces authentication and authorization for current user.
 
     Args:
@@ -66,10 +68,10 @@ def auth_required(permissions: list[Any] | None = None):
     """
 
     def auth_checker(
-        user: Annotated[BaseUser, Depends(get_user)],
+        user: Annotated[user_class, Depends(get_user)],
     ):
-        # If user is not authenticated
-        if not user.is_authenticated:
+        # If user is not authenticated or its authentication type is invalid
+        if not user.is_authenticated or not isinstance(user, user_class):
             raise HTTPException(HTTPStatus.UNAUTHORIZED)
 
         # If user is not authorized

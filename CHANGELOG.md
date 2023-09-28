@@ -1,5 +1,12 @@
 # Change log
 
+## Version 1.1.0
+
+### Added:
+ - auth_required(): `user_class` parameter added which ensures the authenticated user is an instance of given type.
+ - Mixed auth example implemented.
+
+
 ## Version 1.0.0
 
 ### Added:

@@ -20,7 +20,7 @@ class Permission(BaseModel):
     scopes: list[str] | None = None
 
 
-class User(BaseUser):
+class APIKeyUser(BaseUser):
     """A test user class which has sub and permissions"""
 
     api_key: str
@@ -46,11 +46,11 @@ class User(BaseUser):
         return f"API user: {masked_api_key}"
 
 
-async def get_user(api_key: str) -> User | None:
+async def get_user(api_key: str) -> APIKeyUser | None:
     if api_key not in API_KEYS:
         return None
 
-    return User(api_key=api_key, scopes=API_KEYS[api_key])
+    return APIKeyUser(api_key=api_key, scopes=API_KEYS[api_key])
 
 
 app = FastAPI(
