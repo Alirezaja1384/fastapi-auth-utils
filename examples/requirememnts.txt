@@ -1,0 +1,6 @@
+
+fastapi==0.101.0
+fastapi-auth-utils @ file:///home/alireza/Projects/fastapi-auth-utils
+pydantic==2.1.1
+PyJWT==2.8.0
+uvicorn==0.23.2
