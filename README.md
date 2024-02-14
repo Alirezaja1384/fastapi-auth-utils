@@ -1,4 +1,4 @@
-# fastapi-auth-utilities
+# fastapi-auth-utils
 A minimal authentication/authorization utility for FastAPI.
 
 ## How tom install
