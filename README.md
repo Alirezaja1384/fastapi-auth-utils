@@ -13,7 +13,7 @@ poetry add fastapi-auth-utils
 ```
 
 ## How to use
-See [examples](./examples/)
+See [examples](https://github.com/alirezaja1384/fastapi-auth-utils/tree/main/examples)
 
 ## License
 MIT

@@ -1,5 +1,12 @@
 # Change log
 
+## Version 1.1.2
+ - README.md: Examples' link fixed for pypi.
+ - Package's `__init__.py`: `__version__` added.
+
+## Version 1.1.1
+ - README.md: Installation instructions added.
+
 ## Version 1.1.0
 
 ### Added:
